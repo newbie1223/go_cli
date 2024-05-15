@@ -92,10 +92,60 @@
 // 	}
 // }
 
+// package main
+
+// import (
+// 	"fmt"
+
+// 	"github.com/gdamore/tcell/v2"
+// 	"github.com/rivo/tview"
+// )
+
+// func main() {
+// 	app := tview.NewApplication()
+
+// 	// チャット履歴を表示するためのTextViewを作成します。
+// 	historyView := tview.NewTextView().
+// 		SetDynamicColors(true).
+// 		SetRegions(true).
+// 		SetChangedFunc(func() {
+// 			app.Draw()
+// 		})
+
+// 	// ユーザーがメッセージを入力するためのInputFieldを作成します。
+// 	inputField := tview.NewInputField()
+// 	inputField.SetLabel("メッセージ: ")
+// 	inputField.SetFieldWidth(0)
+// 	inputField.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+// 		if event.Key() == tcell.KeyEnter {
+// 			// メッセージを取得してクリアします。
+// 			message := inputField.GetText()
+// 			inputField.SetText("")
+
+// 			// メッセージを履歴に追加します。
+// 			fmt.Fprintf(historyView, "あなた: %s\n", message)
+// 		}
+// 		return event
+// 	})
+
+// 	// レイアウトを作成します。
+// 	flex := tview.NewFlex().
+// 		SetDirection(tview.FlexRow).
+// 		AddItem(historyView, 0, 1, false).
+// 		AddItem(inputField, 1, 1, true)
+
+// 	if err := app.SetRoot(flex, true).Run(); err != nil {
+// 		panic(err)
+// 	}
+// // }
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"net"
+	"strings"
+	"time"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -103,38 +153,52 @@ import (
 
 func main() {
 	app := tview.NewApplication()
-
-	// チャット履歴を表示するためのTextViewを作成します。
-	historyView := tview.NewTextView().
-		SetDynamicColors(true).
-		SetRegions(true).
-		SetChangedFunc(func() {
-			app.Draw()
-		})
-
-	// ユーザーがメッセージを入力するためのInputFieldを作成します。
 	inputField := tview.NewInputField()
-	inputField.SetLabel("メッセージ: ")
-	inputField.SetFieldWidth(0)
-	inputField.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyEnter {
-			// メッセージを取得してクリアします。
-			message := inputField.GetText()
-			inputField.SetText("")
+	chatView := tview.NewTextView()
 
-			// メッセージを履歴に追加します。
-			fmt.Fprintf(historyView, "あなた: %s\n", message)
+	go func() {
+		listener, _ := net.Listen("tcp", ":8080")
+		for {
+			conn, _ := listener.Accept()
+			go handleConnection(conn, chatView, app)
 		}
-		return event
+	}()
+
+	inputField.SetDoneFunc(func(key tcell.Key) {
+		if key == tcell.KeyEnter {
+			text := inputField.GetText()
+			if text != "" {
+				fmt.Fprintf(chatView, "You: %s\n", text)
+				conn, _ := net.Dial("tcp", "localhost:8080")
+				fmt.Fprintf(conn, text+"\n")
+				conn.Close()
+				inputField.SetText("")
+			}
+		}
 	})
 
-	// レイアウトを作成します。
-	flex := tview.NewFlex().
-		SetDirection(tview.FlexRow).
-		AddItem(historyView, 0, 1, false).
+	flex := tview.NewFlex().SetDirection(tview.FlexRow).
+		AddItem(chatView, 0, 1, false).
 		AddItem(inputField, 1, 1, true)
 
 	if err := app.SetRoot(flex, true).Run(); err != nil {
 		panic(err)
+	}
+}
+
+func handleConnection(conn net.Conn, chatView *tview.TextView, app *tview.Application) {
+	defer conn.Close()
+
+	reader := bufio.NewReader(conn)
+	for {
+		message, _ := reader.ReadString('\n')
+		if message == "" {
+			break
+		}
+		message = strings.TrimSpace(message)
+		app.QueueUpdateDraw(func() {
+			fmt.Fprintf(chatView, "%s: %s\n", conn.RemoteAddr(), message)
+		})
+		time.Sleep(100 * time.Millisecond)
 	}
 }

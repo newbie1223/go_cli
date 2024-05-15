@@ -72,7 +72,6 @@ func createLayout(cList tview.Primitive, recvPanel tview.Primitive, tPanel tview
 	// layout = tview.NewFlex().SetDirection(tview.FlexRow).AddItem(bodyLayout, 0, 1, true)
 	// bodyLayout := tview.NewGrid().AddItem(cList, 0, 0, 0, 0, 0, 0, true).AddItem(recvPanel, 0, 0, 1, 2, 100, 0, true).AddItem(tPanel, 1, 1, 3, 2, 300, 0, true)
 	// layout = tview.NewFlex().SetDirection(tview.FlexRow).AddItem(bodyLayout, 0, 1, true)
-
 	return layout
 }
 
